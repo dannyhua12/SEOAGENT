@@ -56,6 +56,16 @@ This will prompt you for:
 - **Word count**: Target article length
 - **Article type**: Guide, review, how-to, list, or comparison
 
+### Alternative: Main Script
+
+You can also use the main script:
+
+```bash
+python main.py
+```
+
+This provides the same functionality as `seo_agent.py` and allows you to add your own custom prompts along the way.
+
 ### Command Line Options
 
 ```bash
