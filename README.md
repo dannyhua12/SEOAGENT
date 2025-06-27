@@ -1,15 +1,16 @@
 # SEO Agent
 
-An intelligent SEO content generation tool powered by OpenAI that creates high-quality, SEO-optimized articles based on your target keywords.
+An intelligent SEO content generation tool powered by OpenAI that creates high-quality, SEO-optimized articles and generates targeted keywords based on your topics.
 
 ## Features
 
 - 🎯 **Keyword-focused content** - Optimized for your target keywords
+- 🔍 **Keyword generation** - Generate SEO keywords for any topic using chat
 - 📝 **Multiple article types** - Guides, reviews, how-to articles, lists, and comparisons
 - 🎨 **Flexible tone options** - Formal, informal, conversational, or professional
 - 📊 **SEO optimization** - Meta titles, descriptions, and structured content
 - 📁 **Multiple output formats** - JSON and Markdown files
-- 🔧 **Easy CLI interface** - Simple command-line tool for quick article generation
+- 🔧 **Easy CLI interface** - Simple command-line tool for quick article and keyword generation
 
 ## Setup
 
@@ -56,6 +57,34 @@ This will prompt you for:
 - **Word count**: Target article length
 - **Article type**: Guide, review, how-to, list, or comparison
 
+### Generate SEO Keywords
+
+Use the keyword generation feature to get targeted SEO keywords for any topic:
+
+```bash
+# Generate keywords for a topic
+python seo_agent.py keywords --topic "digital marketing"
+
+# Specify number of keywords
+python seo_agent.py keywords --topic "weight loss" --count 20
+
+# Generate specific types of keywords
+python seo_agent.py keywords --topic "coffee brewing" --types primary_keywords --types long_tail_keywords
+
+# Short options
+python seo_agent.py keywords -t "yoga for beginners" -c 25 -y question_keywords -y local_keywords
+```
+
+### Standalone Keyword Generator
+
+For keyword generation only:
+
+```bash
+python generate_keywords.py
+```
+
+This provides an interactive interface for keyword generation without the full CLI framework.
+
 ### Alternative: Main Script
 
 You can also use the main script:
@@ -72,14 +101,17 @@ This provides the same functionality as `seo_agent.py` and allows you to add you
 # Basic usage with prompts
 python seo_agent.py
 
-# Specify all options
-python seo_agent.py --keyword "best protein powder" --tone informal --word-count 1500 --article-type guide
+# Generate article with all options
+python seo_agent.py article --keyword "best protein powder" --tone informal --word-count 1500 --article-type guide
 
-# Short options
-python seo_agent.py -k "digital marketing tips" -t professional -w 2000 -a how-to
+# Generate keywords with all options
+python seo_agent.py keywords --topic "digital marketing" --count 20 --types primary_keywords --types long_tail_keywords
 
-# Custom output directory
-python seo_agent.py -k "seo strategies" -o my_articles
+# Short options for article
+python seo_agent.py article -k "digital marketing tips" -t professional -w 2000 -a how-to
+
+# Short options for keywords
+python seo_agent.py keywords -t "seo strategies" -c 15 -y question_keywords
 ```
 
 ### Programmatic Usage
@@ -107,6 +139,12 @@ The tool generates two files for each article:
 1. **JSON file** (`article-{keyword}.json`) - Structured data with all article components
 2. **Markdown file** (`article-{keyword}.md`) - Formatted article ready for publishing
 
+### Keyword Generation Output
+
+For keyword generation, the tool creates:
+
+1. **JSON file** (`keywords-{topic}.json`) - Structured data with all generated keywords
+
 ### Article Structure
 
 Each generated article includes:
@@ -118,24 +156,47 @@ Each generated article includes:
 - **FAQ section** - Common questions and answers
 - **SEO tips** - Optimization recommendations
 
+### Keyword Structure
+
+Each generated keyword set includes:
+
+- **Primary keywords** - Main target keywords (1-3 words)
+- **Long-tail keywords** - Longer, specific phrases (4+ words)
+- **Question keywords** - What, how, why questions
+- **Local keywords** - Location-based keywords
+- **Related keywords** - Synonyms and related terms
+- **SEO insights** - Search volume estimates and competition levels
+
 ## Examples
 
 ### Generate a Guide Article
 
 ```bash
-python seo_agent.py -k "how to start a blog" -t conversational -w 1500 -a guide
+python seo_agent.py article -k "how to start a blog" -t conversational -w 1500 -a guide
+```
+
+### Generate Keywords for a Topic
+
+```bash
+python seo_agent.py keywords -t "vegan recipes" -c 20
+```
+
+### Generate Specific Keyword Types
+
+```bash
+python seo_agent.py keywords -t "home workout" -y primary_keywords -y question_keywords -y local_keywords
 ```
 
 ### Generate a Product Review
 
 ```bash
-python seo_agent.py -k "best wireless headphones 2024" -t professional -w 2000 -a review
+python seo_agent.py article -k "best wireless headphones 2024" -t professional -w 2000 -a review
 ```
 
 ### Generate a How-To Article
 
 ```bash
-python seo_agent.py -k "how to make sourdough bread" -t informal -w 1800 -a how-to
+python seo_agent.py article -k "how to make sourdough bread" -t informal -w 1800 -a how-to
 ```
 
 ## Configuration
@@ -162,6 +223,14 @@ You can customize the behavior using these environment variables in your `.env` 
 - **informal** - Casual and friendly
 - **conversational** - Chatty and engaging
 - **professional** - Business-focused
+
+### Keyword Types
+
+- **primary_keywords** - Main target keywords (1-3 words)
+- **long_tail_keywords** - Longer, specific phrases (4+ words)
+- **question_keywords** - What, how, why questions
+- **local_keywords** - Location-based keywords
+- **related_keywords** - Synonyms and related terms
 
 ## Troubleshooting
 

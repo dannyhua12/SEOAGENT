@@ -1,23 +1,29 @@
 #!/usr/bin/env python3
 """
-SEO Agent - Interactive CLI tool for generating SEO-optimized articles
+SEO Agent - Interactive CLI tool for generating SEO-optimized articles and keywords
 """
 
 import click
 import os
 import json
 from writer import generate_article
+from keyword_generator import generate_keywords, save_keywords_to_file, display_keywords
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-@click.command()
+@click.group()
+def cli():
+    """SEO Agent - Generate SEO-optimized articles and keywords"""
+    pass
+
+@cli.command()
 @click.option('--keyword', '-k', prompt='Enter your target topic', help='The main topic to target')
 @click.option('--tone', '-t', default='informal', type=click.Choice(['formal', 'informal', 'conversational', 'professional']), help='Tone of the article')
 @click.option('--word-count', '-w', default=1200, type=int, help='Target word count for the article')
 @click.option('--article-type', '-a', default='guide', type=click.Choice(['guide', 'review', 'how-to', 'list', 'comparison']), help='Type of article to generate')
-def main(keyword, tone, word_count, article_type):
+def article(keyword, tone, word_count, article_type):
     """Generate SEO-optimized articles using OpenAI"""
     
     # Check if OpenAI API key is set
@@ -96,6 +102,65 @@ def main(keyword, tone, word_count, article_type):
     except Exception as e:
         click.echo(f"❌ Error: {str(e)}")
         click.echo("Please check your OpenAI API key and internet connection.")
+
+@cli.command()
+@click.option('--topic', '-t', prompt='Enter your topic', help='The topic to generate keywords for')
+@click.option('--count', '-c', default=15, type=int, help='Number of keywords to generate')
+@click.option('--types', '-y', multiple=True, 
+              type=click.Choice(['primary_keywords', 'long_tail_keywords', 'question_keywords', 'local_keywords', 'related_keywords']),
+              help='Types of keywords to generate (can specify multiple)')
+def keywords(topic, count, types):
+    """Generate SEO keywords for a given topic using chat"""
+    
+    # Check if OpenAI API key is set
+    if not os.getenv("OPENAI_API_KEY"):
+        click.echo("❌ Error: OPENAI_API_KEY not found in environment variables.")
+        click.echo("Please create a .env file with your OpenAI API key:")
+        click.echo("OPENAI_API_KEY=your_api_key_here")
+        return
+    
+    # Set output directory to ~/SEO articles
+    output_dir = os.path.expanduser('~/SEO articles')
+    os.makedirs(output_dir, exist_ok=True)
+    
+    click.echo(f"\n🔍 Generating SEO keywords...")
+    click.echo(f"Topic: {topic}")
+    click.echo(f"Keyword count: {count}")
+    if types:
+        click.echo(f"Keyword types: {', '.join(types)}")
+    else:
+        click.echo("Keyword types: All types")
+    click.echo("-" * 50)
+    
+    try:
+        # Convert types tuple to list, or use None for all types
+        keyword_types = list(types) if types else None
+        
+        # Generate keywords
+        keywords_data = generate_keywords(topic, count, keyword_types)
+        
+        if keywords_data:
+            # Display keywords
+            display_keywords(keywords_data)
+            
+            # Save to file
+            filepath = save_keywords_to_file(keywords_data, topic, output_dir)
+            click.echo(f"\n✅ Keywords saved to: {filepath}")
+            
+            # Show summary
+            total_keywords = sum(len(keyword_list) for keyword_list in keywords_data.get('keywords', {}).values())
+            click.echo(f"📊 Total keywords generated: {total_keywords}")
+            
+        else:
+            click.echo("❌ Failed to generate keywords. Please check your OpenAI API key and try again.")
+            
+    except Exception as e:
+        click.echo(f"❌ Error: {str(e)}")
+        click.echo("Please check your OpenAI API key and internet connection.")
+
+def main():
+    """Main entry point for backward compatibility"""
+    cli()
 
 if __name__ == '__main__':
     main()
