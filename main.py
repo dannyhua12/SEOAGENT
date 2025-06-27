@@ -1,4 +1,5 @@
 from writer import generate_article
+from keyword_generator import generate_keywords, display_keywords
 import json
 import os
 
@@ -51,7 +52,7 @@ def get_user_input():
         return None
     
     return {
-        "keyword": topic,
+        "topic": topic,
         "tone": tone,
         "word_count": word_count,
         "article_type": article_type
@@ -64,42 +65,75 @@ def main():
         print("❌ Invalid inputs. Please try again.")
         return
     
-    print(f"\n🎯 Generating article with:")
-    print(f"   Keyword: {inputs['keyword']}")
-    print(f"   Tone: {inputs['tone']}")
-    print(f"   Word count: {inputs['word_count']}")
-    print(f"   Article type: {inputs['article_type']}")
-    print("\n⏳ Generating article...")
+    print(f"\n🎯 Topic: {inputs['topic']}")
+    print(f"📝 Tone: {inputs['tone']}")
+    print(f"📊 Word count: {inputs['word_count']}")
+    print(f"📄 Article type: {inputs['article_type']}")
     
-    # Generate article
-    data = generate_article(
-        inputs['keyword'], 
-        inputs['tone'], 
-        inputs['word_count'], 
-        inputs['article_type']
-    )
-
-    if data:
-        # Create outputs directory if it doesn't exist
-        os.makedirs("outputs", exist_ok=True)
+    # Step 1: Generate keywords
+    print("\n🔍 Generating keywords...")
+    try:
+        keywords_data = generate_keywords(inputs['topic'], 15)
         
-        slug = inputs['keyword'].lower().replace(" ", "-")
-        json_path = f"outputs/article-{slug}.json"
-        md_path = f"outputs/article-{slug}.md"
+        if keywords_data:
+            # Display keywords in terminal
+            display_keywords(keywords_data)
+            
+            # Get primary keywords for article generation
+            primary_keywords = keywords_data.get('keywords', {}).get('primary_keywords', [])
+            if primary_keywords:
+                # Use the first primary keyword for article generation
+                article_keyword = primary_keywords[0]
+                print(f"\n📝 Using keyword for article: '{article_keyword}'")
+            else:
+                # Fallback to original topic
+                article_keyword = inputs['topic']
+                print(f"\n📝 Using original topic for article: '{article_keyword}'")
+            
+            # Step 2: Generate article
+            print(f"\n⏳ Generating article...")
+            data = generate_article(
+                article_keyword, 
+                inputs['tone'], 
+                inputs['word_count'], 
+                inputs['article_type']
+            )
 
-        with open(json_path, "w") as f:
-            json.dump(data, f, indent=2)
+            if data:
+                # Set output directory to ~/SEO articles
+                output_dir = os.path.expanduser('~/SEO articles')
+                os.makedirs(output_dir, exist_ok=True)
+                
+                slug = inputs['topic'].lower().replace(" ", "-").replace("/", "-")
+                json_path = os.path.join(output_dir, f"article-{slug}.json")
+                md_path = os.path.join(output_dir, f"article-{slug}.md")
+                keywords_path = os.path.join(output_dir, f"keywords-{slug}.json")
 
-        with open(md_path, "w") as f:
-            f.write(f"# {data['article_title']}\n\n")
-            for section in data['article_sections']:
-                f.write(f"## {section['heading']}\n{section['content']}\n\n")
+                # Save article
+                with open(json_path, "w", encoding='utf-8') as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
 
-        print(f"\n✅ Article saved to:")
-        print(f"   📄 {json_path}")
-        print(f"   📝 {md_path}")
-    else:
-        print("❌ Failed to generate article.")
+                with open(md_path, "w", encoding='utf-8') as f:
+                    f.write(f"# {data['article_title']}\n\n")
+                    for section in data['article_sections']:
+                        f.write(f"## {section['heading']}\n{section['content']}\n\n")
+
+                # Save keywords
+                with open(keywords_path, "w", encoding='utf-8') as f:
+                    json.dump(keywords_data, f, indent=2, ensure_ascii=False)
+
+                print(f"\n✅ Files saved to:")
+                print(f"   📄 Article JSON: {json_path}")
+                print(f"   📝 Article Markdown: {md_path}")
+                print(f"   🔍 Keywords JSON: {keywords_path}")
+            else:
+                print("❌ Failed to generate article.")
+        else:
+            print("❌ Failed to generate keywords. Please check your OpenAI API key and try again.")
+            
+    except Exception as e:
+        print(f"❌ Error: {str(e)}")
+        print("Please check your OpenAI API key and internet connection.")
 
 if __name__ == "__main__":
     main()
