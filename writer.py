@@ -28,7 +28,7 @@ def clean_json_response(text_output):
     except json.JSONDecodeError:
         return None
 
-def generate_article(keyword, tone="informal", word_count=1000, article_type="guide", model=None, temperature=None):
+def generate_article(keyword, tone="informal", word_count=1000, article_type="guide", model=None, temperature=None, keywords_list=None):
     """
     Generate an SEO-optimized article using OpenAI
     
@@ -39,6 +39,7 @@ def generate_article(keyword, tone="informal", word_count=1000, article_type="gu
         article_type (str): Type of article (guide, review, how-to, list, comparison)
         model (str): OpenAI model to use (default: gpt-4)
         temperature (float): Creativity level (0.0-1.0)
+        keywords_list (list): List of keywords to use in the article
     
     Returns:
         dict: Article data in JSON format or None if generation failed
@@ -51,7 +52,7 @@ def generate_article(keyword, tone="informal", word_count=1000, article_type="gu
     model = model or DEFAULT_MODEL
     temperature = temperature or DEFAULT_TEMPERATURE
     
-    prompt = build_prompt(keyword, tone, word_count, article_type)
+    prompt = build_prompt(keyword, tone, word_count, article_type, keywords_list)
     
     try:
         response = openai.ChatCompletion.create(
@@ -72,26 +73,26 @@ def generate_article(keyword, tone="informal", word_count=1000, article_type="gu
             missing_fields = [field for field in required_fields if field not in data]
             
             if missing_fields:
-                print(f"⚠️ Warning: Missing required fields: {missing_fields}")
+                print(f"\u26a0\ufe0f Warning: Missing required fields: {missing_fields}")
                 print("Raw response:")
                 print(text_output)
                 return None
             
             return data
         else:
-            print("⚠️ Failed to parse JSON response. Raw output:")
+            print("\u26a0\ufe0f Failed to parse JSON response. Raw output:")
             print(text_output)
             return None
             
     except openai.error.AuthenticationError:
-        print("❌ Authentication error: Please check your OpenAI API key.")
+        print("\u274c Authentication error: Please check your OpenAI API key.")
         return None
     except openai.error.RateLimitError:
-        print("❌ Rate limit exceeded: Please wait a moment and try again.")
+        print("\u274c Rate limit exceeded: Please wait a moment and try again.")
         return None
     except openai.error.APIError as e:
-        print(f"❌ OpenAI API error: {e}")
+        print(f"\u274c OpenAI API error: {e}")
         return None
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        print(f"\u274c Unexpected error: {e}")
         return None

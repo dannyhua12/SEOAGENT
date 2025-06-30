@@ -190,6 +190,22 @@ def display_keywords(keywords_data):
         print(f"   Competition: {insights.get('competition_level', 'Unknown')}")
         print(f"   Recommended Focus: {insights.get('recommended_focus', 'All keywords')}")
 
+def get_flat_keywords_list(topic, keyword_count=15, keyword_types=None):
+    """
+    Generate a flat list of keywords for a given topic as a JSON property 'keywords'.
+    Args:
+        topic (str): The main topic to generate keywords for
+        keyword_count (int): Number of keywords to generate (default: 15)
+        keyword_types (list): Types of keywords to include (default: all types)
+    Returns:
+        dict: {"keywords": [ ... ]}
+    """
+    keywords_data = generate_keywords(topic, keyword_count, keyword_types)
+    flat_keywords = []
+    for kw_list in keywords_data.get('keywords', {}).values():
+        flat_keywords.extend(kw_list)
+    return {"keywords": flat_keywords}
+
 if __name__ == "__main__":
     # Example usage
     topic = input("Enter your topic: ").strip()

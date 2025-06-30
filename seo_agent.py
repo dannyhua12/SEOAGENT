@@ -7,7 +7,7 @@ import click
 import os
 import json
 from writer import generate_article
-from keyword_generator import generate_keywords, save_keywords_to_file, display_keywords
+from keyword_generator import generate_keywords, save_keywords_to_file, display_keywords, get_flat_keywords_list
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -45,8 +45,12 @@ def article(keyword, tone, word_count, article_type):
     click.echo("-" * 50)
     
     try:
-        # Generate the article
-        data = generate_article(keyword, tone, word_count, article_type)
+        # Generate flat keywords list for the topic
+        flat_keywords_obj = get_flat_keywords_list(keyword, 15)
+        flat_keywords = flat_keywords_obj["keywords"]
+        
+        # Generate the article using the keywords
+        data = generate_article(keyword, tone, word_count, article_type, keywords_list=flat_keywords)
         
         if data:
             # Create filenames

@@ -1,4 +1,10 @@
-def build_prompt(keyword, tone, word_count, article_type):
+def build_prompt(keyword, tone, word_count, article_type, keywords_list=None):
+    keywords_section = ""
+    if keywords_list:
+        keywords_str = ", ".join(f'"{kw}"' for kw in keywords_list)
+        keywords_section = f"""
+- Use ALL of the following keywords naturally throughout the article: {keywords_str}
+"""
     return f"""
 You are an expert SEO content writer. Create a comprehensive, SEO-optimized {article_type} article targeting the keyword: "{keyword}".
 
@@ -6,7 +12,7 @@ Requirements:
 - Target word count: {word_count} words
 - Tone: {tone}
 - Include the target keyword naturally throughout the content
-- Create engaging, informative content that provides real value
+{keywords_section}- Create engaging, informative content that provides real value
 - Include relevant subheadings for better structure
 - Add a FAQ section with common questions about the topic
 
