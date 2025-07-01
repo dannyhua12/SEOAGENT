@@ -6,10 +6,53 @@ User interfaces for SEO tools: CLI (Click) and interactive terminal mode.
 import os
 import click
 from seo_tools import (
-    generate_keywords, display_keywords, get_flat_keywords_list, save_keywords_to_file,
-    generate_article_with_functions, save_article_and_keywords
+    generate_keywords_with_tools, display_keywords, get_flat_keywords_list, save_keywords_to_file,
+    generate_article_with_tools, save_article_and_keywords, get_model_context_limit
 )
 import json
+
+def calculate_article_word_count(data):
+    """Calculate the total word count of an article including all sections."""
+    total_words = 0
+    
+    # Count article title
+    if data.get('article_title'):
+        total_words += len(data['article_title'].split())
+    
+    # Count meta description
+    if data.get('meta_description'):
+        total_words += len(data['meta_description'].split())
+    
+    # Count all article sections content
+    for section in data.get('article_sections', []):
+        if section.get('heading'):
+            total_words += len(section['heading'].split())
+        if section.get('content'):
+            total_words += len(section['content'].split())
+    
+    # Count FAQ section
+    for faq in data.get('faq', []):
+        if faq.get('question'):
+            total_words += len(faq['question'].split())
+        if faq.get('answer'):
+            total_words += len(faq['answer'].split())
+    
+    # Count SEO tips
+    for tip in data.get('seo_tips', []):
+        total_words += len(tip.split())
+    
+    return total_words
+
+def display_word_count_info(total_words, target_words, use_click=False):
+    """Display word count information with warnings if needed."""
+    output_func = click.echo if use_click else print
+    
+    output_func(f"📊 Word count: ~{total_words} words")
+    output_func(f"📊 Target was: {target_words} words")
+    if total_words < target_words * 0.8:
+        output_func(f"⚠️ Warning: Generated article is significantly shorter than target ({total_words} vs {target_words} words)")
+    elif total_words > target_words * 1.2:
+        output_func(f"⚠️ Warning: Generated article is significantly longer than target ({total_words} vs {target_words} words)")
 
 def get_user_input():
     print("🚀 SEO Article Generator")
@@ -47,11 +90,27 @@ def get_user_input():
     if article_type not in valid_types:
         print(f"❌ Invalid article type. Please choose from: {', '.join(valid_types)}")
         return None
+    
+    # Ask about model selection for longer articles
+    if word_count > 1500:
+        print(f"\n🤖 Model selection for {word_count} word article:")
+        print("- gpt-4: Standard model (8192 token limit)")
+        print("- gpt-4-turbo: Higher context limit (128k tokens)")
+        print("- gpt-3.5-turbo-16k: Good balance of cost and context")
+        model_input = input("Select model (gpt-4/gpt-4-turbo/gpt-3.5-turbo-16k, default: gpt-4): ").strip().lower()
+        if model_input in ['gpt-4-turbo', 'gpt-3.5-turbo-16k']:
+            selected_model = model_input
+        else:
+            selected_model = 'gpt-4'
+    else:
+        selected_model = 'gpt-4'
+    
     return {
         "topic": topic,
         "tone": tone,
         "word_count": word_count,
-        "article_type": article_type
+        "article_type": article_type,
+        "model": selected_model
     }
 
 # --- Interactive Terminal Mode ---
@@ -64,9 +123,15 @@ def interactive_main():
     print(f"📝 Tone: {inputs['tone']}")
     print(f"📊 Word count: {inputs['word_count']}")
     print(f"📄 Article type: {inputs['article_type']}")
+    print(f"🤖 Model: {inputs['model']}")
+    
+    # Show context limit info
+    context_limit = get_model_context_limit(inputs['model'])
+    print(f"📊 Context limit: {context_limit:,} tokens")
+    
     print("\n🔍 Generating keywords...")
     try:
-        keywords_data = generate_keywords(inputs['topic'], 15)
+        keywords_data = generate_keywords_with_tools(inputs['topic'], 15)
         if keywords_data:
             display_keywords(keywords_data)
             primary_keywords = keywords_data.get('keywords', {}).get('primary_keywords', [])
@@ -77,11 +142,12 @@ def interactive_main():
                 article_keyword = inputs['topic']
                 print(f"\n📝 Using original topic for article: '{article_keyword}'")
             print(f"\n⏳ Generating article...")
-            data = generate_article_with_functions(
+            data = generate_article_with_tools(
                 article_keyword,
                 inputs['tone'],
                 inputs['word_count'],
-                inputs['article_type']
+                inputs['article_type'],
+                model=inputs['model']
             )
             if data:
                 json_path, md_path, keywords_path = save_article_and_keywords(data, keywords_data, inputs['topic'])
@@ -89,6 +155,10 @@ def interactive_main():
                 print(f"   📄 Article JSON: {json_path}")
                 print(f"   📝 Article Markdown: {md_path}")
                 print(f"   🔍 Keywords JSON: {keywords_path}")
+                
+                # Calculate and display actual word count
+                total_words = calculate_article_word_count(data)
+                display_word_count_info(total_words, inputs['word_count'])
             else:
                 print("❌ Failed to generate article.")
         else:
@@ -108,7 +178,8 @@ def cli():
 @click.option('--tone', '-t', default='informal', type=click.Choice(['formal', 'informal', 'conversational', 'professional']), help='Tone of the article')
 @click.option('--word-count', '-w', default=1200, type=int, help='Target word count for the article')
 @click.option('--article-type', '-a', default='guide', type=click.Choice(['guide', 'review', 'how-to', 'list', 'comparison']), help='Type of article to generate')
-def article(keyword, tone, word_count, article_type):
+@click.option('--model', '-m', default='gpt-4', type=click.Choice(['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo-16k']), help='OpenAI model to use')
+def article(keyword, tone, word_count, article_type, model):
     """Generate SEO-optimized articles using OpenAI"""
     if not os.getenv("OPENAI_API_KEY"):
         click.echo("❌ Error: OPENAI_API_KEY not found in environment variables.")
@@ -122,11 +193,17 @@ def article(keyword, tone, word_count, article_type):
     click.echo(f"Tone: {tone}")
     click.echo(f"Word count: {word_count}")
     click.echo(f"Article type: {article_type}")
+    click.echo(f"Model: {model}")
+    
+    # Show context limit info
+    context_limit = get_model_context_limit(model)
+    click.echo(f"Context limit: {context_limit:,} tokens")
+    
     click.echo("-" * 50)
     try:
         flat_keywords_obj = get_flat_keywords_list(keyword, 15)
         flat_keywords = flat_keywords_obj["keywords"]
-        data = generate_article_with_functions(keyword, tone, word_count, article_type, keywords_list=flat_keywords)
+        data = generate_article_with_tools(keyword, tone, word_count, article_type, keywords_list=flat_keywords, model=model)
         if data:
             slug = keyword.lower().replace(" ", "-").replace("/", "-")
             json_path = os.path.join(output_dir, f"article-{slug}.json")
@@ -154,10 +231,10 @@ def article(keyword, tone, word_count, article_type):
             click.echo(f"\n✅ Article generated successfully!")
             click.echo(f"📄 JSON: {json_path}")
             click.echo(f"📝 Markdown: {md_path}")
-            actual_word_count = len(data.get('article_title', '').split()) + sum(
-                len(section.get('content', '').split()) for section in data.get('article_sections', [])
-            )
-            click.echo(f"📊 Word count: ~{actual_word_count} words")
+            
+            # Calculate actual word count including ALL content sections
+            total_words = calculate_article_word_count(data)
+            display_word_count_info(total_words, word_count, use_click=True)
         else:
             click.echo("❌ Failed to generate article. Please check your OpenAI API key and try again.")
     except Exception as e:
@@ -189,7 +266,7 @@ def keywords(topic, count, types):
     click.echo("-" * 50)
     try:
         keyword_types = list(types) if types else None
-        keywords_data = generate_keywords(topic, count, keyword_types)
+        keywords_data = generate_keywords_with_tools(topic, count, keyword_types)
         if keywords_data:
             display_keywords(keywords_data)
             filepath = save_keywords_to_file(keywords_data, topic, output_dir)

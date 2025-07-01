@@ -11,6 +11,9 @@ An intelligent SEO content generation tool powered by OpenAI that creates high-q
 - 📊 **SEO optimization** - Meta titles, descriptions, and structured content
 - 📁 **Multiple output formats** - JSON and Markdown files
 - 🔧 **Easy CLI interface** - Simple command-line tool for quick article and keyword generation
+- 🤖 **Smart model selection** - Automatically choose the right model for your article length
+- 📏 **Accurate word counting** - Count all content including FAQ and SEO tips
+- ⚡ **Single-attempt generation** - Powerful prompts ensure correct word count on first try
 
 ## Setup
 
@@ -198,6 +201,33 @@ python seo_agent.py article -k "best wireless headphones 2024" -t professional -
 ```bash
 python seo_agent.py article -k "how to make sourdough bread" -t informal -w 1800 -a how-to
 ```
+
+## Model Selection and Token Limits
+
+The system supports multiple OpenAI models with different context limits. Choose the right model for your article length:
+
+### Available Models
+
+| Model | Context Limit | Best For | Cost |
+|-------|---------------|----------|------|
+| `gpt-4` | 8,192 tokens | Articles up to ~1,500 words | Standard |
+| `gpt-4-turbo` | 128,000 tokens | Articles up to ~25,000 words | Higher |
+| `gpt-3.5-turbo-16k` | 16,384 tokens | Articles up to ~3,000 words | Lower |
+
+### Model Selection Examples
+
+```bash
+# Short article (default GPT-4)
+python seo_interface.py article -k "coffee brewing" -w 1200
+
+# Medium article (cost-effective)
+python seo_interface.py article -k "digital marketing" -w 2000 -m gpt-3.5-turbo-16k
+
+# Long article (high context limit)
+python seo_interface.py article -k "comprehensive guide" -w 5000 -m gpt-4-turbo
+```
+
+For more details, see [TOKEN_LIMITS_GUIDE.md](TOKEN_LIMITS_GUIDE.md).
 
 ## Configuration
 
