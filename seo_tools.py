@@ -12,95 +12,70 @@ from typing import List, Dict, Any, Optional
 load_dotenv()
 
 # --- Article Generation ---
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4")
-DEFAULT_TEMPERATURE = float(os.getenv("TEMPERATURE", "0.7"))
 
-def get_model_context_limit(model_name):
-    """Get the context length limit for a given model."""
-    model_limits = {
-        "gpt-4": 8192,
-        "gpt-4-32k": 32768,
-        "gpt-4-turbo": 128000,
-        "gpt-4-turbo-preview": 128000,
-        "gpt-3.5-turbo": 4096,
-        "gpt-3.5-turbo-16k": 16384,
-    }
-    return model_limits.get(model_name, 8192)  # Default to 8192 if unknown
 
-def calculate_safe_max_tokens(model_name, base_tokens=4000, attempt=0):
-    """Calculate a safe max_tokens value that won't exceed context limits."""
-    context_limit = get_model_context_limit(model_name)
-    
-    # Reserve some tokens for the prompt and response overhead
-    reserved_tokens = 2000  # Conservative estimate for prompt + overhead
-    available_tokens = context_limit - reserved_tokens
-    
-    # Calculate tokens for this attempt
-    attempt_tokens = min(base_tokens + (attempt * 500), available_tokens)
-    
-    return max(1000, attempt_tokens)  # Ensure minimum of 1000 tokens
 
-def generate_article_with_tools(keyword, tone="informal", word_count=1000, article_type="guide", model=None, temperature=None, keywords_list=None):
+def generate_article_with_tools(keyword, tone="informal", article_type="guide", model=None, keywords_list=None):
     """
-    Generate an SEO article using OpenAI tools instead of JSON examples in the prompt.
+    Generate an SEO article using OpenAI Responses API with function calling.
     This is a more reliable approach than the build_prompt method.
     """
     if not os.getenv("OPENAI_API_KEY"):
         raise ValueError("OpenAI API key not found. Please set OPENAI_API_KEY in your .env file.")
     
-    model = model or DEFAULT_MODEL
-    temperature = temperature or DEFAULT_TEMPERATURE
+    # Use gpt-4.1 as default for Responses API
+    model = model or "gpt-4.1"
     
-    # Define the tool schema with proper typing
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "generate_seo_article",
-                "description": "Generate a comprehensive SEO-optimized article with all required components",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "meta_title": {"type": "string", "description": "SEO-optimized title (50-60 characters)"},
-                        "meta_description": {"type": "string", "description": "Compelling description (150-160 characters)"},
-                        "article_title": {"type": "string", "description": "Engaging main title"},
-                        "target_keyword": {"type": "string", "description": "The target keyword for this article"},
-                        "word_count": {"type": "integer", "description": "Target word count for the article"},
-                        "article_sections": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "heading": {"type": "string", "description": "H2 heading for the section"},
-                                    "content": {"type": "string", "description": "Well-written content with natural keyword usage"}
-                                },
-                                "required": ["heading", "content"]
-                            },
-                            "description": "Article sections with headings and content"
+    # Define the tool schema for Responses API
+    tools = [{
+        "type": "function",
+        "name": "generate_seo_article",
+        "description": "Generate a comprehensive SEO-optimized article with all required components",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "meta_title": {"type": "string", "description": "SEO-optimized title (50-60 characters)"},
+                "meta_description": {"type": "string", "description": "Compelling description (150-160 characters)"},
+                "article_title": {"type": "string", "description": "Engaging main title"},
+                "target_keyword": {"type": "string", "description": "The target keyword for this article"},
+                "word_count": {"type": "integer", "description": "Target word count for the article"},
+                "article_sections": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "heading": {"type": "string", "description": "H2 heading for the section"},
+                            "content": {"type": "string", "description": "Well-written content with natural keyword usage"}
                         },
-                        "faq": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "question": {"type": "string", "description": "Common question about the topic"},
-                                    "answer": {"type": "string", "description": "Clear, helpful answer"}
-                                },
-                                "required": ["question", "answer"]
-                            },
-                            "description": "Frequently asked questions and answers"
-                        },
-                        "seo_tips": {
-                            "type": "array",
-                            "items": {"type": "string", "description": "SEO optimization tip"},
-                            "description": "List of SEO optimization tips"
-                        }
+                        "required": ["heading", "content"],
+                        "additionalProperties": False
                     },
-                    "required": ["meta_title", "meta_description", "article_title", "target_keyword", "word_count", "article_sections", "faq", "seo_tips"]
+                    "description": "Article sections with headings and content"
+                },
+                "faq": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "question": {"type": "string", "description": "Common question about the topic"},
+                            "answer": {"type": "string", "description": "Clear, helpful answer"}
+                        },
+                        "required": ["question", "answer"],
+                        "additionalProperties": False
+                    },
+                    "description": "Frequently asked questions and answers"
+                },
+                "seo_tips": {
+                    "type": "array",
+                    "items": {"type": "string", "description": "SEO optimization tip"},
+                    "description": "List of SEO optimization tips"
                 }
-            }
-        }
-    ]
+            },
+            "required": ["meta_title", "meta_description", "article_title", "target_keyword", "word_count", "article_sections", "faq", "seo_tips"],
+            "additionalProperties": False
+        },
+        "strict": True
+    }]
     
     # Build the prompt without JSON examples
     keywords_section = ""
@@ -111,90 +86,49 @@ def generate_article_with_tools(keyword, tone="informal", word_count=1000, artic
 """
     
     prompt = f"""
-You are an expert SEO content writer. Create a comprehensive, SEO-optimized {article_type} article targeting the keyword: "{keyword}".
+Generate a comprehensive SEO-optimized article about "{keyword}".
 
-CRITICAL REQUIREMENTS:
-- Target word count: EXACTLY {word_count} words (±10% tolerance)
+Article Requirements:
 - Tone: {tone}
-- Include the target keyword naturally throughout the content
-{keywords_section}- Create engaging, informative content that provides real value
-- Include relevant subheadings for better structure
-- Add a FAQ section with common questions about the topic
+- Article type: {article_type}
+{keywords_section}
 
-WORD COUNT BREAKDOWN (MANDATORY):
-- Article sections (main content): {int(word_count * 0.7)}-{int(word_count * 0.8)} words
-- FAQ section: {int(word_count * 0.15)}-{int(word_count * 0.2)} words  
-- SEO tips: {int(word_count * 0.05)}-{int(word_count * 0.1)} words
-- Total target: {word_count} words
+The article must include:
+1. SEO-optimized meta title (50-60 characters)
+2. Compelling meta description (150-160 characters)
+3. Engaging article title
+4. Well-structured content with H2 headings
+5. Natural keyword usage throughout
+6. FAQ section with relevant questions
+7. SEO optimization tips
 
-CONTENT STRUCTURE GUIDELINES:
-- Create 4-6 detailed article sections with substantial content
-- Each section should be {int(word_count * 0.15)}-{int(word_count * 0.25)} words
-- Include 3-5 comprehensive FAQ questions with detailed answers
-- Each FAQ answer should be 50-100 words
-- Include 3-5 actionable SEO tips
-
-CRITICAL INSTRUCTION: You MUST generate exactly {word_count} words. This is not optional. Write comprehensive, detailed content that thoroughly covers the topic. Do not be brief or superficial. Expand every section with examples, explanations, and detailed information. If you generate fewer than {int(word_count * 0.9)} words, the article will be rejected.
-
-Make sure the content is original, engaging, and provides genuine value to readers while being optimized for search engines.
+Make sure the content is:
+- Comprehensive and detailed
+- Well-researched and accurate
+- Engaging and readable
+- Optimized for search engines
 """
-    
+
     try:
-        messages = [
-            {
-                "role": "system", 
-                "content": f"You are a verbose, comprehensive content writer. Always write detailed, thorough content. Your target is {word_count} words. Never write short or superficial content. Expand every topic with examples, explanations, and detailed information."
-            },
-            {"role": "user", "content": prompt}
-        ]
-        
-        response = client.chat.completions.create(
+        # Use Responses API
+        response = client.responses.create(
             model=model,
-            messages=messages,  # type: ignore
-            tools=tools,  # type: ignore
-            tool_choice={"type": "function", "function": {"name": "generate_seo_article"}},
-            temperature=temperature,
-            max_tokens=calculate_safe_max_tokens(model, 4000)
+            input=[{"role": "user", "content": prompt}],
+            tools=tools  # type: ignore
         )
         
-        if response.choices[0].message.tool_calls:
-            tool_call = response.choices[0].message.tool_calls[0]
-            if tool_call and tool_call.function.name == "generate_seo_article":
-                data = json.loads(tool_call.function.arguments)
+        # Handle function calls from Responses API
+        if response.output and len(response.output) > 0:
+            tool_call = response.output[0]
+            if tool_call.type == "function_call" and tool_call.name == "generate_seo_article":
+                data = json.loads(tool_call.arguments)
                 required_fields = ['article_title', 'article_sections']
                 missing_fields = [field for field in required_fields if field not in data]
                 if missing_fields:
                     print(f"⚠️ Warning: Missing required fields: {missing_fields}")
                     return None
                 
-                # Validate word count
-                total_content = ""
-                if data.get('article_title'):
-                    total_content += data['article_title'] + " "
-                for section in data.get('article_sections', []):
-                    if section.get('heading'):
-                        total_content += section['heading'] + " "
-                    if section.get('content'):
-                        total_content += section['content'] + " "
-                for faq in data.get('faq', []):
-                    if faq.get('question'):
-                        total_content += faq['question'] + " "
-                    if faq.get('answer'):
-                        total_content += faq['answer'] + " "
-                for tip in data.get('seo_tips', []):
-                    total_content += tip + " "
-                
-                actual_word_count = len(total_content.split())
-                target_min = int(word_count * 0.8)
-                target_max = int(word_count * 1.2)
-                
-                if actual_word_count < target_min:
-                    print(f"❌ Error: Generated article is too short ({actual_word_count} words vs target {word_count} words)")
-                    print(f"   The article must be at least {target_min} words. Please try again with a different approach.")
-                    return None
-                elif actual_word_count > target_max:
-                    print(f"⚠️ Warning: Generated article is too long ({actual_word_count} words vs target {word_count} words)")
-                    print(f"   The article is {actual_word_count - word_count} words over target, but will be accepted.")
+                # Return the generated article data
                 
                 return data
             else:
@@ -215,7 +149,7 @@ client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def generate_keywords_with_tools(topic, keyword_count=15, keyword_types=None):
     """
-    Generate keywords using OpenAI tools instead of JSON examples in the prompt.
+    Generate keywords using OpenAI Responses API with function calling.
     This is a more reliable approach than the original generate_keywords method.
     """
     if not os.getenv("OPENAI_API_KEY"):
@@ -230,44 +164,46 @@ def generate_keywords_with_tools(topic, keyword_count=15, keyword_types=None):
             "related_keywords"
         ]
     
-    # Define the tool schema with proper typing
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "generate_seo_keywords",
-                "description": "Generate SEO keywords for content optimization",
-                "parameters": {
+    # Define the tool schema for Responses API
+    tools = [{
+        "type": "function",
+        "name": "generate_seo_keywords",
+        "description": "Generate SEO keywords for content optimization",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "topic": {"type": "string", "description": "The main topic for keyword generation"},
+                "total_keywords": {"type": "integer", "description": "Total number of keywords generated"},
+                "keywords": {
                     "type": "object",
                     "properties": {
-                        "topic": {"type": "string", "description": "The main topic for keyword generation"},
-                        "total_keywords": {"type": "integer", "description": "Total number of keywords generated"},
-                        "keywords": {
-                            "type": "object",
-                            "properties": {
-                                "primary_keywords": {"type": "array", "items": {"type": "string"}},
-                                "long_tail_keywords": {"type": "array", "items": {"type": "string"}},
-                                "question_keywords": {"type": "array", "items": {"type": "string"}},
-                                "local_keywords": {"type": "array", "items": {"type": "string"}},
-                                "related_keywords": {"type": "array", "items": {"type": "string"}}
-                            },
-                            "description": "Keywords organized by type"
-                        },
-                        "seo_insights": {
-                            "type": "object",
-                            "properties": {
-                                "search_volume_estimate": {"type": "string", "description": "Estimated search volume (high/medium/low)"},
-                                "competition_level": {"type": "string", "description": "Competition level (high/medium/low)"},
-                                "recommended_focus": {"type": "string", "description": "Recommended keywords to focus on"}
-                            },
-                            "description": "SEO insights and recommendations"
-                        }
+                        "primary_keywords": {"type": "array", "items": {"type": "string"}},
+                        "long_tail_keywords": {"type": "array", "items": {"type": "string"}},
+                        "question_keywords": {"type": "array", "items": {"type": "string"}},
+                        "local_keywords": {"type": "array", "items": {"type": "string"}},
+                        "related_keywords": {"type": "array", "items": {"type": "string"}}
                     },
-                    "required": ["topic", "total_keywords", "keywords", "seo_insights"]
+                    "required": ["primary_keywords", "long_tail_keywords", "question_keywords", "local_keywords", "related_keywords"],
+                    "description": "Keywords organized by type",
+                    "additionalProperties": False
+                },
+                "seo_insights": {
+                    "type": "object",
+                    "properties": {
+                        "search_volume_estimate": {"type": "string", "description": "Estimated search volume (high/medium/low)"},
+                        "competition_level": {"type": "string", "description": "Competition level (high/medium/low)"},
+                        "recommended_focus": {"type": "string", "description": "Recommended keywords to focus on"}
+                    },
+                    "required": ["search_volume_estimate", "competition_level", "recommended_focus"],
+                    "description": "SEO insights and recommendations",
+                    "additionalProperties": False
                 }
-            }
-        }
-    ]
+            },
+            "required": ["topic", "total_keywords", "keywords", "seo_insights"],
+            "additionalProperties": False
+        },
+        "strict": True
+    }]
     
     # Build the prompt without JSON examples
     keyword_type_descriptions = {
@@ -303,22 +239,18 @@ Make sure all keywords are:
 """
     
     try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are an expert SEO specialist who generates high-quality, searchable keywords for content optimization."},
-                {"role": "user", "content": prompt}
-            ],
-            tools=tools,  # type: ignore
-            tool_choice={"type": "function", "function": {"name": "generate_seo_keywords"}},
-            temperature=0.7,
-            max_tokens=1000
+        # Use Responses API
+        response = client.responses.create(
+            model="gpt-4.1",
+            input=[{"role": "user", "content": prompt}],
+            tools=tools  # type: ignore
         )
         
-        if response.choices[0].message.tool_calls:
-            tool_call = response.choices[0].message.tool_calls[0]
-            if tool_call and tool_call.function.name == "generate_seo_keywords":
-                keywords_data = json.loads(tool_call.function.arguments)
+        # Handle function calls from Responses API
+        if response.output and len(response.output) > 0:
+            tool_call = response.output[0]
+            if tool_call.type == "function_call" and tool_call.name == "generate_seo_keywords":
+                keywords_data = json.loads(tool_call.arguments)
                 return keywords_data
             else:
                 print("⚠️ No function call response received")
@@ -333,14 +265,14 @@ Make sure all keywords are:
 # --- Backward Compatibility Functions ---
 def generate_article_with_functions(keyword, tone="informal", word_count=1000, article_type="guide", model=None, temperature=None, keywords_list=None):
     """
-    Backward compatibility function that uses the new tool-based approach.
+    Backward compatibility function that uses the new Responses API approach.
     This replaces the old function that used JSON examples in prompts.
     """
-    return generate_article_with_tools(keyword, tone, word_count, article_type, model, temperature, keywords_list)
+    return generate_article_with_tools(keyword, tone, article_type, model, keywords_list)
 
 def generate_keywords(topic, keyword_count=15, keyword_types=None):
     """
-    Backward compatibility function that uses the new tool-based approach.
+    Backward compatibility function that uses the new Responses API approach.
     This replaces the old function that used JSON examples in prompts.
     """
     return generate_keywords_with_tools(topic, keyword_count, keyword_types)
